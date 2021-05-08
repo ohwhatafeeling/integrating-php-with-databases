@@ -1,12 +1,17 @@
 <?php
 
-function get_catalog_count($category = null) {
+function get_catalog_count($category = null, $search = null) {
   $category = strtolower($category);
   include ("connection.php");
 
   try {
     $sql = "SELECT COUNT(media_id) FROM Media";
-    if (!empty($category)) {
+    if (!empty($search)) {
+      $results = $db->prepare(
+        $sql . " WHERE title LIKE ?"
+      );
+      $results->bindValue(1, '%'.$search.'%', PDO::PARAM_STR);
+    } else if (!empty($category)) {
       $results = $db->prepare(
         $sql . " WHERE LOWER(category) = ?"
       );
@@ -24,7 +29,7 @@ function get_catalog_count($category = null) {
 }
 
 function full_catalog_array($limit = null, $offset = 0) {
-  include ("connection.php");
+  include("connection.php");
 
   try {
     $sql = "SELECT media_id, title, category, img
@@ -40,11 +45,47 @@ function full_catalog_array($limit = null, $offset = 0) {
       ''
     )";
     if (is_integer($limit)) {
-      $results = $db->prepare($sql . " LIMIT = ? OFFSET = ?");
+      $results = $db->prepare($sql . "LIMIT ? OFFSET ?");
       $results->bindParam(1, $limit, PDO::PARAM_INT);
       $results->bindParam(2, $offset, PDO::PARAM_INT);
     } else {
       $results = $db->prepare($sql);
+    }
+    $results->execute();
+  } catch(Exception $e) {
+    echo "Unable to retrive results";
+    exit;
+  }
+
+  $catalog = $results->fetchAll(PDO::FETCH_ASSOC);
+  return $catalog;
+}
+
+function search_catalog_array($search, $limit = null, $offset = 0) {
+  include("connection.php");
+
+  try {
+    $sql = "SELECT media_id, title, category, img
+    FROM Media
+    WHERE title LIKE ?
+    ORDER BY
+    REPLACE(
+      REPLACE(
+        REPLACE(title, 'The ', ''),
+        'An ',
+        ''
+      ),
+      'A ',
+      ''
+    )";
+    if (is_integer($limit)) {
+      $results = $db->prepare($sql . " LIMIT ? OFFSET ?");
+      $results->bindValue(1, "%".$search."%", PDO::PARAM_STR);
+      $results->bindParam(2, $limit, PDO::PARAM_INT);
+      $results->bindParam(3, $offset, PDO::PARAM_INT);
+    } else {
+      $results = $db->prepare($sql);
+      $results->bindValue(1, "%".$search."%", PDO::PARAM_STR);
     }
     $results->execute();
   } catch(Exception $e) {
